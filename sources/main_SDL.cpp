@@ -1,41 +1,12 @@
+#include <vector>
+#include <stdio.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl3.h>
 #include <imgui/imgui_impl_opengl3.h>
-#include <stdio.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
-
-int current_sine_sample = 0;
-
-void SDLCALL data_callback(void *userdata, SDL_AudioStream *astream, int additional_amount, int total_amount)
-{
-	/* total_amount is how much data the audio stream is eating right now, additional_amount is how much more it needs
-	   than what it currently has queued (which might be zero!). You can supply any amount of data here; it will take what
-	   it needs and use the extra later. If you don't give it enough, it will take everything and then feed silence to the
-	   hardware for the rest. Ideally, though, we always give it what it needs and no extra, so we aren't buffering more
-	   than necessary. */
-	additional_amount /= sizeof(int16_t);  /* convert from bytes to samples */
-	while (additional_amount > 0)
-	{
-		int16_t samples[128];  /* this will feed 128 samples each iteration until we have enough. */
-		const int total = SDL_min(additional_amount, SDL_arraysize(samples));
-
-		for (int i = 0; i < total; i++)
-		{
-			const int freq = 220;
-			const float phase = current_sine_sample * freq / 48000.0f;
-			samples[i] = (int16_t)(0x2000 * SDL_sinf(phase * 2 * SDL_PI_F));
-			current_sine_sample++;
-		}
-
-		/* wrapping around to avoid floating-point errors */
-		current_sine_sample %= 48000;
-
-		/* feed the new data to the stream. It will queue at the end, and trickle out as the hardware needs more data. */
-		SDL_PutAudioStreamData(astream, samples, total * sizeof(int16_t));
-		additional_amount -= total;  /* subtract what we've just fed the stream. */
-	}
-}
+#include <PeripheralGroup.hpp>
+#include <Speaker.hpp>
 
 int main(int, char**)
 {
@@ -79,19 +50,6 @@ int main(int, char**)
 		return 1;
 	}
 
-	SDL_AudioSpec spec;
-
-	spec.channels = 1;
-	spec.format = SDL_AUDIO_S16;
-	spec.freq = 48000;
-	SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, data_callback, NULL);
-	if (!stream)
-	{
-		SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
-		return SDL_APP_FAILURE;
-	}
-	SDL_ResumeAudioStreamDevice(stream);
-
 	SDL_GL_MakeCurrent(window, gl_context);
 	SDL_GL_SetSwapInterval(1); // Enable vsync
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
@@ -129,6 +87,11 @@ int main(int, char**)
 	ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
+	std::vector<PeripheralGroup> groups;
+	groups.push_back(PeripheralGroup());
+	groups.back().SearchForPattern({0x51, 0xea, 0x5d, 0x2a, 0x59, 0x6a, 0x45, 0xaa, 0x41, 0xea, 0x4d, 0x2a, 0x49, 0x6a, 0x55, 0xaa});
+	groups.back().AddPeripheral(new Speaker());
+
 	// Main loop
 	bool done = false;
 
@@ -150,6 +113,16 @@ int main(int, char**)
 				done = true;
 		}
 
+		groups.back().Update();
+		if (groups.back().IsBound())
+		{
+			Speaker *ptr = reinterpret_cast<Speaker *>(groups.back().GetPeripherals().back());
+			if (ptr->HasAudioStream())
+				ptr->Update();
+			else
+				ptr->CreateAudioStream(Speaker::Short, 48000, false);
+		}
+
 		// Start the Dear ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplSDL3_NewFrame();
@@ -161,7 +134,7 @@ int main(int, char**)
 
 			ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
-			ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+			ImGui::Text("deez: %d", groups.back().IsBound());
 
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 			ImGui::End();

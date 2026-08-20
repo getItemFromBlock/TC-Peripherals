@@ -148,8 +148,15 @@
     <ClCompile Include="external\include\imgui\imgui_widgets.cpp" />
     <ClCompile Include="external\sources\imgui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="external\sources\imgui\imgui_impl_sdl3.cpp" />
+    <ClCompile Include="external\sources\imgui\imgui_stdlib.cpp" />
+    <ClCompile Include="sources\Controller.cpp" />
+    <ClCompile Include="sources\GameLinker.cpp" />
+    <ClCompile Include="sources\Keyboard.cpp" />
     <ClCompile Include="sources\main_SDL.cpp" />
-    <ClCompile Include="sources\miniaudio.c" />
+    <ClCompile Include="sources\Peripheral.cpp" />
+    <ClCompile Include="sources\PeripheralGroup.cpp" />
+    <ClCompile Include="sources\Speaker.cpp" />
+    <ClCompile Include="sources\TouchScreen.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="external\include\imgui\imconfig.h" />
@@ -158,6 +165,7 @@
     <ClInclude Include="external\include\imgui\imgui_impl_opengl3_loader.h" />
     <ClInclude Include="external\include\imgui\imgui_impl_sdl3.h" />
     <ClInclude Include="external\include\imgui\imgui_internal.h" />
+    <ClInclude Include="external\include\imgui\imgui_stdlib.h" />
     <ClInclude Include="external\include\imgui\imstb_rectpack.h" />
     <ClInclude Include="external\include\imgui\imstb_textedit.h" />
     <ClInclude Include="external\include\imgui\imstb_truetype.h" />
@@ -247,7 +255,23 @@
     <ClInclude Include="external\include\SDL3\SDL_version.h" />
     <ClInclude Include="external\include\SDL3\SDL_video.h" />
     <ClInclude Include="external\include\SDL3\SDL_vulkan.h" />
+    <ClInclude Include="headers\Controller.h" />
+    <ClInclude Include="headers\Controller.hpp" />
+    <ClInclude Include="headers\GameLinker.h" />
+    <ClInclude Include="headers\GameLinker.hpp" />
+    <ClInclude Include="headers\Keyboard.h" />
+    <ClInclude Include="headers\Keyboard.hpp" />
     <ClInclude Include="headers\miniaudio.h" />
+    <ClInclude Include="headers\Peripheral.h" />
+    <ClInclude Include="headers\Peripheral.hpp" />
+    <ClInclude Include="headers\PeripheralGroup.h" />
+    <ClInclude Include="headers\PeripheralGroup.hpp" />
+    <ClInclude Include="headers\Speaker.h" />
+    <ClInclude Include="headers\Speaker.hpp" />
+    <ClInclude Include="headers\TouchScreen.h" />
+    <ClInclude Include="headers\TouchScreen.hpp" />
+    <ClInclude Include="headers\Types.h" />
+    <ClInclude Include="headers\Types.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
