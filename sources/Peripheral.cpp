@@ -14,9 +14,14 @@ void Peripheral::SetAddress(u64 value)
 bool Peripheral::DrawGuiBase(const char *title)
 {
 	ImGui::BeginChild(title);
-	ImGui::Text("%s", "Current offset:");
+	ImGui::Text("Current offset: %#010x", offset);
+	ImGui::InputText("offset", &offsetAsText, ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsNoBlank);
 	ImGui::SameLine();
-	bool res = ImGui::InputText("offset", &text, ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsNoBlank);
+	if (ImGui::SmallButton("Set offset"))
+	{
+		offset = std::atoi(offsetAsText.c_str());
+		return true;
+	}
 
 	return false;
 }

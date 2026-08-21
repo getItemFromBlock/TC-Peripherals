@@ -1,4 +1,5 @@
 #include <vector>
+#include <thread>
 #include <stdio.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl3.h>
@@ -7,6 +8,12 @@
 #include <SDL3/SDL_opengl.h>
 #include <PeripheralGroup.hpp>
 #include <Speaker.hpp>
+
+std::vector<PeripheralGroup> groups;
+std::atomic_bool shouldExit = false;
+std::thread updateThread;
+
+void thread_main();
 
 int main(int, char**)
 {
@@ -87,10 +94,11 @@ int main(int, char**)
 	ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
-	std::vector<PeripheralGroup> groups;
 	groups.push_back(PeripheralGroup());
 	groups.back().SearchForPattern({0x51, 0xea, 0x5d, 0x2a, 0x59, 0x6a, 0x45, 0xaa, 0x41, 0xea, 0x4d, 0x2a, 0x49, 0x6a, 0x55, 0xaa});
 	groups.back().AddPeripheral(new Speaker());
+
+	updateThread = std::thread(thread_main);
 
 	// Main loop
 	bool done = false;
@@ -114,6 +122,7 @@ int main(int, char**)
 		}
 
 		groups.back().Update();
+		/*
 		if (groups.back().IsBound())
 		{
 			Speaker *ptr = reinterpret_cast<Speaker *>(groups.back().GetPeripherals().back());
@@ -122,6 +131,7 @@ int main(int, char**)
 			else
 				ptr->CreateAudioStream(Speaker::Short, 48000, false);
 		}
+		*/
 
 		// Start the Dear ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
@@ -129,6 +139,8 @@ int main(int, char**)
 		ImGui::NewFrame();
 
 		ImGui::DockSpaceOverViewport();
+
+		groups.back().DrawGui();
 
 		{
 
@@ -159,6 +171,9 @@ int main(int, char**)
 		SDL_GL_SwapWindow(window);
 	}
 
+	shouldExit = true;
+	updateThread.join();
+
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
 	ImGui::DestroyContext();
@@ -168,4 +183,15 @@ int main(int, char**)
 	SDL_Quit();
 
 	return 0;
+}
+
+void thread_main()
+{
+	while (!shouldExit)
+	{
+		for (size_t i = 0; i < groups.size(); i++)
+		{
+			groups[i].BackgroundUpdate();
+		}
+	}
 }

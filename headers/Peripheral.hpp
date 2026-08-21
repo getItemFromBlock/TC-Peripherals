@@ -16,10 +16,11 @@ public:
 
 	void SetAddress(u64 value);
 
+protected:
 	bool DrawGuiBase(const char *title);
-
+	
 protected:
 	u64 offset = 0;
 	u64 address = 0;
-	std::string text;
+	std::string offsetAsText;
 };

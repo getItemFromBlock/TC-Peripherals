@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 #include <GameLinker.hpp>
+#include <imgui/imgui.h>
+#include <imgui/imgui_stdlib.h>
 
 // Size of the ring buffer, in samples
 #define SOUND_BUFFER_SIZE 16384
@@ -14,6 +16,7 @@
 Speaker::Speaker()
 {
 	soundBuffer = new u32[SOUND_BUFFER_SIZE];
+	copyBuffer = new u32[BUFFER_CHUNK];
 }
 
 Speaker::~Speaker()
@@ -25,6 +28,7 @@ Speaker::~Speaker()
 		boundStream = nullptr;
 	}
 	delete[] soundBuffer;
+	delete[] copyBuffer;
 }
 
 void Speaker::Update()
@@ -51,8 +55,8 @@ void Speaker::Update()
 		{
 		case Speaker::Byte:
 		{
-			u8 tmpBuffer[BUFFER_CHUNK];
-			if (!GameLinker::ReadMemory(address - sizeof(tmpBuffer) - BUFFER_OFFSET, &tmpBuffer, sizeof(tmpBuffer)))
+			u8 *tmpBuffer = reinterpret_cast<u8*>(copyBuffer);
+			if (!GameLinker::ReadMemory(address - BUFFER_CHUNK * sizeof(u8) - BUFFER_OFFSET, tmpBuffer, BUFFER_CHUNK * sizeof(u8)))
 				return;
 			for (int i = 0; i < BUFFER_CHUNK; i++)
 				reinterpret_cast<u8*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[BUFFER_CHUNK - i - 1];
@@ -60,8 +64,8 @@ void Speaker::Update()
 		break;
 		case Speaker::Short:
 		{
-			u16 tmpBuffer[BUFFER_CHUNK];
-			if (!GameLinker::ReadMemory(address - sizeof(tmpBuffer) - BUFFER_OFFSET, &tmpBuffer, sizeof(tmpBuffer)))
+			u16 *tmpBuffer = reinterpret_cast<u16*>(copyBuffer);
+			if (!GameLinker::ReadMemory(address - BUFFER_CHUNK * sizeof(u16) - BUFFER_OFFSET, tmpBuffer, BUFFER_CHUNK * sizeof(u16)))
 				return;
 			for (int i = 0; i < BUFFER_CHUNK; i++)
 				reinterpret_cast<u16*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[BUFFER_CHUNK - i - 1];
@@ -70,8 +74,8 @@ void Speaker::Update()
 		case Speaker::Word:
 		case Speaker::Float:
 		{
-			u32 tmpBuffer[BUFFER_CHUNK];
-			if (!GameLinker::ReadMemory(address - sizeof(tmpBuffer) - BUFFER_OFFSET, &tmpBuffer, sizeof(tmpBuffer)))
+			u32 *tmpBuffer = reinterpret_cast<u32*>(copyBuffer);
+			if (!GameLinker::ReadMemory(address - BUFFER_CHUNK * sizeof(u32) - BUFFER_OFFSET, tmpBuffer, BUFFER_CHUNK * sizeof(u32)))
 				return;
 			for (int i = 0; i < BUFFER_CHUNK; i++)
 				reinterpret_cast<u32*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[BUFFER_CHUNK - i - 1];
@@ -91,12 +95,33 @@ void Speaker::Update()
 
 bool Speaker::DrawGui()
 {
-	return false;
+	const char *dataTypes[] = {"byte", "short", "word", "float"};
+	bool result = DrawGuiBase("Speaker");
+	ImGui::Text("Sound stream state: %s", HasAudioStream() ? "OPEN" : "CLOSED");
+	if (ImGui::SliderFloat("Volume", &volume, 0.0f, 1.0f, "%.02f", ImGuiSliderFlags_AlwaysClamp) && HasAudioStream())
+		SDL_SetAudioStreamGain(boundStream, volume);
+
+	ImGui::Text("Current frequency: %d", frequency);
+	ImGui::Text("Current data type: %s", dataTypes[dataType]);
+	ImGui::Text("Current channel count: %d", stereo ? 2 : 1);
+
+	ImGui::InputInt("Frequency", &frequencyGui);
+	ImGui::ListBox("Data type", &dataTypeGui, dataTypes, sizeof(dataTypes) / sizeof(dataTypes[0]));
+	ImGui::Checkbox("Stereo", &stereoGui);
+	
+	if (ImGui::Button("Create stream"))
+		result |= CreateAudioStream(static_cast<DataType>(dataTypeGui), frequencyGui, stereoGui);
+	if (ImGui::Button("Stop stream"))
+		StopAudioStream();
+	ImGui::EndChild();
+
+	return result;
 }
 
 u64 Speaker::GetSize()
 {
-	return u64();
+	u32 dataSize = dataType == Byte ? 1 : (dataType == Short ? 2 : 4);
+	return BUFFER_OFFSET + BUFFER_CHUNK * dataSize * (stereo ? 2 : 1);
 }
 
 void SDLCALL data_callback(void *userdata, SDL_AudioStream *astream, int additional_amount, int total_amount)
@@ -107,37 +132,42 @@ void SDLCALL data_callback(void *userdata, SDL_AudioStream *astream, int additio
 
 void Speaker::_SoundUpdate(SDL_AudioStream *stream, s32 frame_count)
 {
-	if (soundPosA == soundPosB)
+	s32 dif = (soundPosA - soundPosB);
+	if (dif == 0)
 		return;
 
-	u32 mult = 1;
+	u32 mult = 4;
 	if (dataType == Short)
 		mult = 2;
-	else if (dataType != Byte)
-		mult = 4;
+	else if (dataType == Byte)
+		mult = 1;
 
-	s32 dif = (soundPosA - soundPosB);
 	if (dif < 0)
 		dif += SOUND_BUFFER_SIZE;
 	if (dif > frame_count)
 		dif = frame_count;
-	SDL_PutAudioStreamData(stream, reinterpret_cast<u8*>(soundBuffer) + soundPosB * mult, dif * mult);
-	soundPosB += dif;
-	if (soundPosB >= SOUND_BUFFER_SIZE)
-		soundPosB -= SOUND_BUFFER_SIZE;
+	if (soundPosB + dif >= SOUND_BUFFER_SIZE)
+	{
+		u32 dt = soundPosB + dif - SOUND_BUFFER_SIZE;
+		SDL_PutAudioStreamData(stream, reinterpret_cast<u8*>(soundBuffer) + soundPosB * mult, (dif-dt) * mult);
+		SDL_PutAudioStreamData(stream, reinterpret_cast<u8*>(soundBuffer), dt * mult);
+		soundPosB += dif - SOUND_BUFFER_SIZE;
+	}
+	else
+	{
+		SDL_PutAudioStreamData(stream, reinterpret_cast<u8*>(soundBuffer) + soundPosB * mult, dif * mult);
+		soundPosB += dif;
+	}	
 }
 
-bool Speaker::CreateAudioStream(DataType type, u32 freq, bool stereo)
+bool Speaker::CreateAudioStream(DataType type, u32 freq, bool stereoIn)
 {
-	if (boundStream)
-	{
-		SDL_PauseAudioStreamDevice(boundStream);
-		SDL_UnbindAudioStream(boundStream);
-		boundStream = nullptr;
-	}
+	if (HasAudioStream())
+		StopAudioStream();
+
 	dataType = type;
 	frequency = freq;
-	isStereo = stereo;
+	stereo = stereoIn;
 	return CreateAudioStream();
 }
 
@@ -152,7 +182,7 @@ bool Speaker::CreateAudioStream()
 	
 	SDL_AudioSpec spec;
 	spec.freq = frequency;
-	spec.channels = isStereo ? 2 : 1;
+	spec.channels = stereo ? 2 : 1;
 	switch (dataType)
 	{
 	case Speaker::Byte:
@@ -170,17 +200,30 @@ bool Speaker::CreateAudioStream()
 		break;
 	}
 
+	soundPosA = 0;
+	soundPosB = 0;
+
 	boundStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, data_callback, this);
 	if (!boundStream)
 	{
-		SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
+		SDL_LogWarn(0, "Couldn't create audio stream: %s", SDL_GetError());
 		return false;
 	}
 
+	SDL_SetAudioStreamGain(boundStream, volume);
 	if (!SDL_ResumeAudioStreamDevice(boundStream))
 	{
-		SDL_Log("Couldn't resume audio stream: %s", SDL_GetError());
+		SDL_LogWarn(0, "Couldn't resume audio stream: %s", SDL_GetError());
 		return false;
 	}
 	return true;
+}
+
+void Speaker::StopAudioStream()
+{
+	if (!boundStream)
+		return;
+	SDL_PauseAudioStreamDevice(boundStream);
+	SDL_UnbindAudioStream(boundStream);
+	boundStream = nullptr;
 }
