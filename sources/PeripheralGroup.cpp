@@ -7,9 +7,8 @@
 PeripheralGroup::~PeripheralGroup()
 {
 	for (size_t i = 0; i < peripherals.size(); i++)
-	{
 		delete peripherals[i];
-	}
+
 	peripherals.clear();
 }
 

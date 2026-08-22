@@ -137,7 +137,9 @@ namespace GameLinker
 
 #ifdef _WIN32
 		u64 nbRead;
-		return WriteProcessMemory(tcHandle, reinterpret_cast<void*>(target), buffer, bufferSize, &nbRead) && nbRead == bufferSize;
+		bool res = WriteProcessMemory(tcHandle, reinterpret_cast<void*>(target), buffer, bufferSize, &nbRead) && nbRead == bufferSize;
+		FlushProcessWriteBuffers();
+		return res;
 #else
 		return false;
 #endif

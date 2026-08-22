@@ -149,6 +149,7 @@
     <ClCompile Include="external\sources\imgui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="external\sources\imgui\imgui_impl_sdl3.cpp" />
     <ClCompile Include="external\sources\imgui\imgui_stdlib.cpp" />
+    <ClCompile Include="external\sources\miniaudio\miniaudio.c" />
     <ClCompile Include="sources\Controller.cpp" />
     <ClCompile Include="sources\GameLinker.cpp" />
     <ClCompile Include="sources\Keyboard.cpp" />
@@ -169,6 +170,7 @@
     <ClInclude Include="external\include\imgui\imstb_rectpack.h" />
     <ClInclude Include="external\include\imgui\imstb_textedit.h" />
     <ClInclude Include="external\include\imgui\imstb_truetype.h" />
+    <ClInclude Include="external\include\miniaudio\miniaudio.h" />
     <ClInclude Include="external\include\SDL3\SDL.h" />
     <ClInclude Include="external\include\SDL3\SDL_assert.h" />
     <ClInclude Include="external\include\SDL3\SDL_asyncio.h" />

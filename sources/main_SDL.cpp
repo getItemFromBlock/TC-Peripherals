@@ -190,8 +190,7 @@ void thread_main()
 	while (!shouldExit)
 	{
 		for (size_t i = 0; i < groups.size(); i++)
-		{
 			groups[i].BackgroundUpdate();
-		}
+
 	}
 }

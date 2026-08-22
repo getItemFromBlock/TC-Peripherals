@@ -63,6 +63,9 @@
     <ClCompile Include="external\sources\imgui\imgui_stdlib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="external\sources\miniaudio\miniaudio.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="external\include\SDL3\SDL.h">
@@ -402,6 +405,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="external\include\imgui\imgui_stdlib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external\include\miniaudio\miniaudio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

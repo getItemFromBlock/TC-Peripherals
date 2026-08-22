@@ -5,6 +5,9 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_stdlib.h>
 
+#define MA_NO_ENGINE
+#include "miniaudio/miniaudio.h"
+
 // Size of the ring buffer, in samples
 #define SOUND_BUFFER_SIZE 16384
 
@@ -17,23 +20,36 @@ Speaker::Speaker()
 {
 	soundBuffer = new u32[SOUND_BUFFER_SIZE];
 	copyBuffer = new u32[BUFFER_CHUNK];
+
+#ifdef USE_MINIAUDIO
+	device = new ma_device();
+#endif
 }
 
 Speaker::~Speaker()
 {
+#ifdef USE_MINIAUDIO
+	if (ma_device_is_started(device))
+	{
+		ma_device_uninit(device);
+	}
+	delete device;
+#else
 	if (boundStream)
 	{
 		SDL_PauseAudioStreamDevice(boundStream);
 		SDL_UnbindAudioStream(boundStream);
 		boundStream = nullptr;
 	}
+#endif
+
 	delete[] soundBuffer;
 	delete[] copyBuffer;
 }
 
 void Speaker::Update()
 {
-	if (!boundStream)
+	if (!HasAudioStream())
 		return;
 	int dif = soundPosA - soundPosB;
 	if (dif < 0)
@@ -99,7 +115,13 @@ bool Speaker::DrawGui()
 	bool result = DrawGuiBase("Speaker");
 	ImGui::Text("Sound stream state: %s", HasAudioStream() ? "OPEN" : "CLOSED");
 	if (ImGui::SliderFloat("Volume", &volume, 0.0f, 1.0f, "%.02f", ImGuiSliderFlags_AlwaysClamp) && HasAudioStream())
+	{
+#ifdef USE_MINIAUDIO
+		volume_atom = volume;
+#else
 		SDL_SetAudioStreamGain(boundStream, volume);
+#endif
+	}
 
 	ImGui::Text("Current frequency: %d", frequency);
 	ImGui::Text("Current data type: %s", dataTypes[dataType]);
@@ -124,23 +146,36 @@ u64 Speaker::GetSize()
 	return BUFFER_OFFSET + BUFFER_CHUNK * dataSize * (stereo ? 2 : 1);
 }
 
-void SDLCALL data_callback(void *userdata, SDL_AudioStream *astream, int additional_amount, int total_amount)
+void SDLCALL data_callback_sdl(void *userdata, SDL_AudioStream *astream, int additional_amount, int total_amount)
 {
-	Speaker *self = reinterpret_cast<Speaker *>(userdata);
-	self->_SoundUpdate(astream, additional_amount);
+	Speaker *self = reinterpret_cast<Speaker*>(userdata);
+	self->_SoundUpdateSDL(astream, additional_amount);
 }
 
-void Speaker::_SoundUpdate(SDL_AudioStream *stream, s32 frame_count)
+void data_callback_ma(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
+{
+	Speaker *self = reinterpret_cast<Speaker*>(pDevice->pUserData);
+	self->_SoundUpdateMA(pOutput, frameCount);
+}
+
+void Speaker::_SoundUpdateSDL(SDL_AudioStream *stream, s32 frame_count)
 {
 	s32 dif = (soundPosA - soundPosB);
 	if (dif == 0)
 		return;
 
-	u32 mult = 4;
+	u32 mult = 1;
 	if (dataType == Short)
+	{
 		mult = 2;
-	else if (dataType == Byte)
-		mult = 1;
+		frame_count >>= 1;
+	}
+	else if (dataType != Byte)
+	{
+		mult = 4;
+		frame_count >>= 2;
+	}
+
 
 	if (dif < 0)
 		dif += SOUND_BUFFER_SIZE;
@@ -158,6 +193,91 @@ void Speaker::_SoundUpdate(SDL_AudioStream *stream, s32 frame_count)
 		SDL_PutAudioStreamData(stream, reinterpret_cast<u8*>(soundBuffer) + soundPosB * mult, dif * mult);
 		soundPosB += dif;
 	}	
+	SDL_FlushAudioStream(stream);
+}
+
+void Speaker::_SoundUpdateMA(void *stream, u32 frame_count)
+{
+	s32 dif = (soundPosA - soundPosB);
+	if (dif == 0)
+		return;
+	float vol = volume_atom;
+
+	switch (dataType)
+	{
+	case Speaker::Byte:
+	{
+		u8 *buffer = reinterpret_cast<u8*>(stream);
+		s8 *bufferIn = reinterpret_cast<s8*>(soundBuffer);
+		for (u32 i = 0; i < frame_count; i++)
+		{
+			if (soundPosA == soundPosB)
+				*buffer = 0;
+			else
+			{
+				*buffer = static_cast<s8>(bufferIn[soundPosB++] * vol) ^ 0x80;
+				if (soundPosB >= SOUND_BUFFER_SIZE)
+					soundPosB = 0;
+			}
+			buffer++;
+		}
+	}
+	break;
+	case Speaker::Short:
+	{
+		s16 *buffer = reinterpret_cast<s16*>(stream);
+		s16 *bufferIn = reinterpret_cast<s16*>(soundBuffer);
+		for (u32 i = 0; i < frame_count; i++)
+		{
+			if (soundPosA == soundPosB)
+				*buffer = 0;
+			else
+			{
+				*buffer = static_cast<s16>(bufferIn[soundPosB++] * vol);
+				if (soundPosB >= SOUND_BUFFER_SIZE)
+					soundPosB = 0;
+			}
+			buffer++;
+		}
+	}
+	break;
+	case Speaker::Word:
+	{
+		s32 *buffer = reinterpret_cast<s32*>(stream);
+		s32 *bufferIn = reinterpret_cast<s32*>(soundBuffer);
+		for (u32 i = 0; i < frame_count; i++)
+		{
+			if (soundPosA == soundPosB)
+				*buffer = 0;
+			else
+			{
+				*buffer = static_cast<s32>(bufferIn[soundPosB++] * vol);
+				if (soundPosB >= SOUND_BUFFER_SIZE)
+					soundPosB = 0;
+			}
+			buffer++;
+		}
+	}
+	break;
+	case Speaker::Float:
+	{
+		float *buffer = reinterpret_cast<float*>(stream);
+		float *bufferIn = reinterpret_cast<float*>(soundBuffer);
+		for (u32 i = 0; i < frame_count; i++)
+		{
+			if (soundPosA == soundPosB)
+				*buffer = 0;
+			else
+			{
+				*buffer = bufferIn[soundPosB++] * vol;
+				if (soundPosB >= SOUND_BUFFER_SIZE)
+					soundPosB = 0;
+			}
+			buffer++;
+		}
+	}
+	break;
+	}
 }
 
 bool Speaker::CreateAudioStream(DataType type, u32 freq, bool stereoIn)
@@ -173,13 +293,55 @@ bool Speaker::CreateAudioStream(DataType type, u32 freq, bool stereoIn)
 
 bool Speaker::CreateAudioStream()
 {
-	if (boundStream)
+	if (HasAudioStream())
 	{
-		SDL_PauseAudioStreamDevice(boundStream);
-		SDL_UnbindAudioStream(boundStream);
-		boundStream = nullptr;
+		StopAudioStream();
+	}
+
+	soundPosA = 0;
+	soundPosB = 0;
+	
+#ifdef USE_MINIAUDIO
+	ma_device_config config = ma_device_config_init(ma_device_type_playback);
+	switch (dataType)
+	{
+	case Speaker::Byte:
+		config.playback.format = ma_format_u8;
+		break;
+	case Speaker::Short:
+		config.playback.format = ma_format_s16;
+		break;
+	case Speaker::Word:
+		config.playback.format = ma_format_s32;
+		break;
+	case Speaker::Float:
+		config.playback.format = ma_format_f32;
+		break;
+	default:
+		config.playback.format = ma_format_f32;
+		break;
+	}
+
+	config.playback.channels = stereo ? 2: 1;
+	config.sampleRate        = frequency;
+	config.dataCallback      = data_callback_ma;
+	config.pUserData         = this;
+
+	ma_result res = ma_device_init(NULL, &config, device);
+	if (res != MA_SUCCESS)
+	{
+		SDL_LogWarn(0, "Could not create audio stream: %d", res);
+		return false;
 	}
 	
+	res = ma_device_start(device);
+	if (res != MA_SUCCESS)
+	{
+		SDL_LogWarn(0, "Couldn't resume audio stream: %d", res);
+		return false;
+	}
+
+#else
 	SDL_AudioSpec spec;
 	spec.freq = frequency;
 	spec.channels = stereo ? 2 : 1;
@@ -187,8 +349,10 @@ bool Speaker::CreateAudioStream()
 	{
 	case Speaker::Byte:
 		spec.format = SDL_AUDIO_S8;
+		break;
 	case Speaker::Short:
 		spec.format = SDL_AUDIO_S16;
+		break;
 	case Speaker::Word:
 		spec.format = SDL_AUDIO_S32;
 		break;
@@ -200,30 +364,42 @@ bool Speaker::CreateAudioStream()
 		break;
 	}
 
-	soundPosA = 0;
-	soundPosB = 0;
-
-	boundStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, data_callback, this);
-	if (!boundStream)
+	boundStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, data_callback_sdl, this);
+	if (!HasAudioStream())
 	{
 		SDL_LogWarn(0, "Couldn't create audio stream: %s", SDL_GetError());
 		return false;
 	}
-
 	SDL_SetAudioStreamGain(boundStream, volume);
+
 	if (!SDL_ResumeAudioStreamDevice(boundStream))
 	{
 		SDL_LogWarn(0, "Couldn't resume audio stream: %s", SDL_GetError());
 		return false;
 	}
+#endif
+
 	return true;
+}
+
+bool Speaker::HasAudioStream() const
+{
+#ifdef USE_MINIAUDIO
+	return ma_device_is_started(device);
+#else
+	return boundStream != nullptr;
+#endif
 }
 
 void Speaker::StopAudioStream()
 {
-	if (!boundStream)
+	if (!HasAudioStream())
 		return;
+#ifdef USE_MINIAUDIO
+	ma_device_uninit(device);
+#else
 	SDL_PauseAudioStreamDevice(boundStream);
 	SDL_UnbindAudioStream(boundStream);
 	boundStream = nullptr;
+#endif
 }

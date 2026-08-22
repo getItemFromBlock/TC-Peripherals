@@ -2,6 +2,9 @@
 
 #include <atomic>
 #include <Peripheral.hpp>
+#include <miniaudio/miniaudio.h>
+
+//#define USE_MINIAUDIO
 
 struct SDL_AudioStream;
 
@@ -25,14 +28,20 @@ public:
 	u64 GetSize() override;
 	bool CreateAudioStream(DataType type, u32 freq, bool stereo);
 	bool CreateAudioStream();
-	bool HasAudioStream() const { return boundStream != nullptr; }
+	bool HasAudioStream() const;
 	void StopAudioStream();
 
 	// Internal use only
-	void _SoundUpdate(SDL_AudioStream *stream, s32 frame_count);
+	void _SoundUpdateSDL(SDL_AudioStream *stream, s32 frame_count);
+	void _SoundUpdateMA(void *stream, u32 frame_count);
 
 private:
+#ifdef USE_MINIAUDIO
+	ma_device *device = nullptr;
+#else
 	SDL_AudioStream *boundStream = nullptr;
+#endif
+
 	float volume = 0.5f;
 
 	DataType dataType = Short;
@@ -47,4 +56,6 @@ private:
 	void *copyBuffer;
 	std::atomic_int soundPosA = 0;
 	std::atomic_int soundPosB = 0;
+
+	std::atomic<float> volume_atom = 0.5f;
 };
