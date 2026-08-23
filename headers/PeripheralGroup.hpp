@@ -13,6 +13,7 @@ public:
 	~PeripheralGroup();
 
 	void SearchForPattern(const std::vector<u8> &pattern, u64 startAddress = 0);
+	void SetPattern(const std::vector<u8> &pattern);
 	void BindAt(u64 targetAddress);
 	void AddPeripheral(Peripheral *periph);
 	const std::vector<Peripheral *> &GetPeripherals() const { return peripherals; }

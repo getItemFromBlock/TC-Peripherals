@@ -22,6 +22,12 @@ void PeripheralGroup::SearchForPattern(const std::vector<u8>& pattern, u64 start
 	UpdatePatternText();
 }
 
+void PeripheralGroup::SetPattern(const std::vector<u8>& pattern)
+{
+	targetPattern = pattern;
+	UpdatePatternText();
+}
+
 void PeripheralGroup::BindAt(u64 targetAddress)
 {
 	tryAutoBind = false;

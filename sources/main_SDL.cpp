@@ -95,7 +95,7 @@ int main(int, char**)
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
 	groups.push_back(PeripheralGroup());
-	groups.back().SearchForPattern({0x51, 0xea, 0x5d, 0x2a, 0x59, 0x6a, 0x45, 0xaa, 0x41, 0xea, 0x4d, 0x2a, 0x49, 0x6a, 0x55, 0xaa});
+	groups.back().SetPattern({0x51, 0xea, 0x5d, 0x2a, 0x59, 0x6a, 0x45, 0xaa, 0x41, 0xea, 0x4d, 0x2a, 0x49, 0x6a, 0x55, 0xaa});
 	groups.back().AddPeripheral(new Speaker());
 
 	updateThread = std::thread(thread_main);
@@ -121,17 +121,10 @@ int main(int, char**)
 				done = true;
 		}
 
-		groups.back().Update();
-		/*
-		if (groups.back().IsBound())
+		for (size_t i = 0; i < groups.size(); i++)
 		{
-			Speaker *ptr = reinterpret_cast<Speaker *>(groups.back().GetPeripherals().back());
-			if (ptr->HasAudioStream())
-				ptr->Update();
-			else
-				ptr->CreateAudioStream(Speaker::Short, 48000, false);
+			groups[i].Update();
 		}
-		*/
 
 		// Start the Dear ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
@@ -140,16 +133,9 @@ int main(int, char**)
 
 		ImGui::DockSpaceOverViewport();
 
-		groups.back().DrawGui();
-
+		for (size_t i = 0; i < groups.size(); i++)
 		{
-
-			ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-			ImGui::Text("deez: %d", groups.back().IsBound());
-
-			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-			ImGui::End();
+			groups[i].DrawGui();
 		}
 
 		ImGui::Render();
