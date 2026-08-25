@@ -24,7 +24,7 @@ public:
 	};
 
 	void Update() override;
-	bool DrawGui() override;
+	bool DrawGui(bool &visible) override;
 	u64 GetSize() override;
 	bool CreateAudioStream(DataType type, u32 freq, bool stereo);
 	bool CreateAudioStream();

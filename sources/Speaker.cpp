@@ -110,34 +110,38 @@ void Speaker::Update()
 	GameLinker::WriteMemory(address - sizeof(flags), &flags, sizeof(flags));
 }
 
-bool Speaker::DrawGui()
+bool Speaker::DrawGui(bool &visible)
 {
 	const char *dataTypes[] = {"byte", "short", "word", "float"};
-	bool result = DrawGuiBase("Speaker");
-	ImGui::Text("Sound stream state: %s", HasAudioStream() ? "OPEN" : "CLOSED");
-	if (ImGui::SliderFloat("Volume", &volume, 0.0f, 1.0f, "%.02f", ImGuiSliderFlags_AlwaysClamp) && HasAudioStream())
+	bool open;
+	bool result = DrawGuiBase("Speaker", open, visible);
+	if (open)
 	{
+		ImGui::Text("Sound stream state: %s", HasAudioStream() ? "OPEN" : "CLOSED");
+		if (ImGui::SliderFloat("Volume", &volume, 0.0f, 1.0f, "%.02f", ImGuiSliderFlags_AlwaysClamp) && HasAudioStream())
+		{
 #ifdef USE_MINIAUDIO
-		volume_atom = volume;
+			volume_atom = volume;
 #else
-		SDL_SetAudioStreamGain(boundStream, volume);
+			SDL_SetAudioStreamGain(boundStream, volume);
 #endif
+		}
+
+		ImGui::Text("Current frequency: %d", frequency);
+		ImGui::Text("Current data type: %s", dataTypes[dataType]);
+		ImGui::Text("Current channel count: %d", stereo ? 2 : 1);
+
+		ImGui::InputInt("Frequency", &frequencyGui);
+		ImGui::ListBox("Data type", &dataTypeGui, dataTypes, sizeof(dataTypes) / sizeof(dataTypes[0]));
+		ImGui::Checkbox("Stereo", &stereoGui);
+
+		if (ImGui::Button("Create stream"))
+			result |= CreateAudioStream(static_cast<DataType>(dataTypeGui), frequencyGui, stereoGui);
+		if (ImGui::Button("Stop stream"))
+			StopAudioStream();
+
+		DrawGuiEnd();
 	}
-
-	ImGui::Text("Current frequency: %d", frequency);
-	ImGui::Text("Current data type: %s", dataTypes[dataType]);
-	ImGui::Text("Current channel count: %d", stereo ? 2 : 1);
-
-	ImGui::InputInt("Frequency", &frequencyGui);
-	ImGui::ListBox("Data type", &dataTypeGui, dataTypes, sizeof(dataTypes) / sizeof(dataTypes[0]));
-	ImGui::Checkbox("Stereo", &stereoGui);
-	
-	if (ImGui::Button("Create stream"))
-		result |= CreateAudioStream(static_cast<DataType>(dataTypeGui), frequencyGui, stereoGui);
-	if (ImGui::Button("Stop stream"))
-		StopAudioStream();
-	ImGui::EndChild();
-
 	return result;
 }
 

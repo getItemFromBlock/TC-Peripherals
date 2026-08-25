@@ -68,7 +68,12 @@ namespace GameLinker
 		{
 			MEMORY_BASIC_INFORMATION infos = {};
 			if (VirtualQueryEx(tcHandle, address, &infos, sizeof(infos)) != sizeof(infos))
+			{
+				CloseHandle(tcHandle);
+				tcHandle = NULL;
+				ConnectToTC();
 				break;
+			}
 			LPVOID start = infos.BaseAddress;
 			if (start < address)
 				start = address;

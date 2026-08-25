@@ -1,4 +1,5 @@
 #include <PeripheralGroup.hpp>
+#include <thread>
 #include <GameLinker.hpp>
 #include <SDL3/SDL.h>
 #include <imgui/imgui.h>
@@ -69,6 +70,8 @@ void PeripheralGroup::Update()
 				bindAttempts++;
 				if (bindAttempts == 8)
 					UpdatePeripheralsAddress();
+				else
+					std::this_thread::sleep_for(std::chrono::milliseconds(50));
 			}
 			else
 			{
@@ -81,7 +84,7 @@ void PeripheralGroup::Update()
 
 void PeripheralGroup::BackgroundUpdate()
 {
-	if (!IsBound())
+	if (!GameLinker::IsConnected() || !IsBound())
 		return;
 	for (size_t i = 0; i < peripherals.size(); i++)
 		peripherals[i]->Update();
@@ -91,8 +94,15 @@ bool PeripheralGroup::DrawGui()
 {
 	bool open = true;
 	ImGui::Begin("Peripheral Group", &open);
-	if (IsBound())
-		ImGui::Text("Bound at: %#010x", boundAddress);
+	if (!GameLinker::IsConnected())
+	{
+		ImGui::Text("%s", "Turing Complete program not found!");
+		ImGui::SameLine();
+		if (ImGui::Button("Refresh"))
+			GameLinker::ConnectToTC();
+	}
+	else if (IsBound())
+		ImGui::Text("Bound at: 0x%p", reinterpret_cast<void*>(boundAddress));
 	else
 		ImGui::Text("%s", "Unbound, press \"Bind\" button");
 
@@ -122,7 +132,18 @@ bool PeripheralGroup::DrawGui()
 	}
 
 	for (size_t i = 0; i < peripherals.size(); i++)
-		recompute |= peripherals[i]->DrawGui();
+	{
+		bool visible = true;
+		recompute |= peripherals[i]->DrawGui(visible);
+		if (!visible)
+		{
+			delete peripherals[i];
+			for (size_t j = i+1; j < peripherals.size(); j++)
+				peripherals[j-1] = peripherals[j];
+			peripherals.pop_back();
+			i--;
+		}
+	}
 
 	ImGui::End();
 	if (recompute)
@@ -134,7 +155,7 @@ bool PeripheralGroup::DrawGui()
 
 bool PeripheralGroup::IsBound() const
 {
-	return (tryAutoBind && bindAttempts >= 4) || (!tryAutoBind && boundAddress);
+	return (tryAutoBind && bindAttempts >= 8) || (!tryAutoBind && boundAddress);
 }
 
 void PeripheralGroup::AddPeripheral(Peripheral *periph)

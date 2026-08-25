@@ -8,6 +8,7 @@
 #include <SDL3/SDL_opengl.h>
 #include <PeripheralGroup.hpp>
 #include <Speaker.hpp>
+#include <GameLinker.hpp>
 
 std::vector<PeripheralGroup> groups;
 std::atomic_bool shouldExit = false;
@@ -94,6 +95,7 @@ int main(int, char**)
 	ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
+	GameLinker::ConnectToTC();
 	groups.push_back(PeripheralGroup());
 	groups.back().SetPattern({0x51, 0xea, 0x5d, 0x2a, 0x59, 0x6a, 0x45, 0xaa, 0x41, 0xea, 0x4d, 0x2a, 0x49, 0x6a, 0x55, 0xaa});
 	groups.back().AddPeripheral(new Speaker());
@@ -137,6 +139,8 @@ int main(int, char**)
 		{
 			groups[i].DrawGui();
 		}
+
+		//ImGui::ShowDemoWindow();
 
 		ImGui::Render();
 		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
