@@ -19,7 +19,7 @@
 Speaker::Speaker()
 {
 	soundBuffer = new u32[SOUND_BUFFER_SIZE];
-	copyBuffer = new u32[BUFFER_CHUNK];
+	copyBuffer = new u32[BUFFER_CHUNK * 2];
 
 #ifdef USE_MINIAUDIO
 	device = new ma_device();
@@ -57,7 +57,7 @@ void Speaker::Update()
 	if (dif > BUFFER_CHUNK * 4)
 		return;
 
-	u16 flags;
+	u8 flags;
 	if (!GameLinker::ReadMemory(address - sizeof(flags), &flags, sizeof(flags)))
 		return;
 
@@ -65,41 +65,42 @@ void Speaker::Update()
 		return;
 	if (flags == 2)
 	{
-		int pos = soundPosA;
+		const int pos = soundPosA;
+		const int buffer_size = BUFFER_CHUNK * (stereo ? 2 : 1);
 
 		switch (dataType)
 		{
 		case Speaker::Byte:
 		{
 			u8 *tmpBuffer = reinterpret_cast<u8*>(copyBuffer);
-			if (!GameLinker::ReadMemory(address - BUFFER_CHUNK * sizeof(u8) - BUFFER_OFFSET, tmpBuffer, BUFFER_CHUNK * sizeof(u8)))
+			if (!GameLinker::ReadMemory(address - buffer_size * sizeof(u8) - BUFFER_OFFSET, tmpBuffer, buffer_size * sizeof(u8)))
 				return;
-			for (int i = 0; i < BUFFER_CHUNK; i++)
-				reinterpret_cast<u8*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[BUFFER_CHUNK - i - 1];
+			for (int i = 0; i < buffer_size; i++)
+				reinterpret_cast<u8*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[buffer_size - i - 1];
 		}
 		break;
 		case Speaker::Short:
 		{
 			u16 *tmpBuffer = reinterpret_cast<u16*>(copyBuffer);
-			if (!GameLinker::ReadMemory(address - BUFFER_CHUNK * sizeof(u16) - BUFFER_OFFSET, tmpBuffer, BUFFER_CHUNK * sizeof(u16)))
+			if (!GameLinker::ReadMemory(address - buffer_size * sizeof(u16) - BUFFER_OFFSET, tmpBuffer, buffer_size * sizeof(u16)))
 				return;
-			for (int i = 0; i < BUFFER_CHUNK; i++)
-				reinterpret_cast<u16*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[BUFFER_CHUNK - i - 1];
+			for (int i = 0; i < buffer_size; i++)
+				reinterpret_cast<u16*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[buffer_size - i - 1];
 		}
 		break;
 		case Speaker::Word:
 		case Speaker::Float:
 		{
 			u32 *tmpBuffer = reinterpret_cast<u32*>(copyBuffer);
-			if (!GameLinker::ReadMemory(address - BUFFER_CHUNK * sizeof(u32) - BUFFER_OFFSET, tmpBuffer, BUFFER_CHUNK * sizeof(u32)))
+			if (!GameLinker::ReadMemory(address - buffer_size * sizeof(u32) - BUFFER_OFFSET, tmpBuffer, buffer_size * sizeof(u32)))
 				return;
-			for (int i = 0; i < BUFFER_CHUNK; i++)
-				reinterpret_cast<u32*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[BUFFER_CHUNK - i - 1];
+			for (int i = 0; i < buffer_size; i++)
+				reinterpret_cast<u32*>(soundBuffer)[(pos + i) % SOUND_BUFFER_SIZE] = tmpBuffer[buffer_size - i - 1];
 		}
 		break;
 		}
 
-		int tmp = soundPosA + BUFFER_CHUNK;
+		int tmp = soundPosA + buffer_size;
 		if (tmp >= SOUND_BUFFER_SIZE)
 			tmp -= SOUND_BUFFER_SIZE;
 		soundPosA = tmp;
@@ -202,6 +203,8 @@ void Speaker::_SoundUpdateMA(void *stream, u32 frame_count)
 	if (dif == 0)
 		return;
 	float vol = volume_atom;
+	if (stereo)
+		frame_count *= 2;
 
 	switch (dataType)
 	{
