@@ -1,4 +1,4 @@
-#include <Speaker.hpp>
+#include <peripherals/Speaker.hpp>
 
 #include <SDL3/SDL.h>
 #include <GameLinker.hpp>
@@ -45,6 +45,8 @@ Speaker::~Speaker()
 
 	delete[] soundBuffer;
 	delete[] copyBuffer;
+
+	Peripheral::~Peripheral();
 }
 
 void Speaker::Update()
@@ -136,7 +138,7 @@ bool Speaker::DrawGui(bool &visible)
 		ImGui::Checkbox("Stereo", &stereoGui);
 
 		if (ImGui::Button("Create stream"))
-			result |= CreateAudioStream(static_cast<DataType>(dataTypeGui), frequencyGui, stereoGui);
+			result |= CreateAudioStream(static_cast<AudioDataType>(dataTypeGui), frequencyGui, stereoGui);
 		if (ImGui::Button("Stop stream"))
 			StopAudioStream();
 
@@ -287,7 +289,7 @@ void Speaker::_SoundUpdateMA(void *stream, u32 frame_count)
 	}
 }
 
-bool Speaker::CreateAudioStream(DataType type, u32 freq, bool stereoIn)
+bool Speaker::CreateAudioStream(AudioDataType type, u32 freq, bool stereoIn)
 {
 	if (HasAudioStream())
 		StopAudioStream();

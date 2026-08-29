@@ -133,8 +133,10 @@ bool PeripheralGroup::DrawGui()
 
 	for (size_t i = 0; i < peripherals.size(); i++)
 	{
+		ImGui::PushID(i);
 		bool visible = true;
 		recompute |= peripherals[i]->DrawGui(visible);
+		ImGui::PopID();
 		if (!visible)
 		{
 			delete peripherals[i];

@@ -7,7 +7,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
 #include <PeripheralGroup.hpp>
-#include <Speaker.hpp>
+#include <peripherals/Speaker.hpp>
+#include <peripherals/Controller.hpp>
 #include <GameLinker.hpp>
 
 std::vector<PeripheralGroup> groups;
@@ -18,6 +19,7 @@ void thread_main();
 
 int main(int, char**)
 {
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO))
 	{
 		printf("Error: SDL_Init(): %s\n", SDL_GetError());
@@ -135,9 +137,41 @@ int main(int, char**)
 
 		ImGui::DockSpaceOverViewport();
 
+		if (ImGui::BeginMainMenuBar())
+		{
+			if (ImGui::BeginMenu("Layout"))
+			{
+				if (ImGui::MenuItem("Save layout"))
+				{
+
+				}
+				if (ImGui::MenuItem("Load layout"))
+				{
+
+				}
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("Group"))
+			{
+				if (ImGui::BeginMenu("Add peripheral"))
+				{
+					if (ImGui::MenuItem("Speaker"))
+						groups.back().AddPeripheral(new Speaker());
+					if (ImGui::MenuItem("Controller"))
+						groups.back().AddPeripheral(new Controller());
+					ImGui::EndMenu();
+				}
+				ImGui::EndMenu();
+			}
+			ImGui::EndMainMenuBar();
+		}
+		
+
 		for (size_t i = 0; i < groups.size(); i++)
 		{
+			ImGui::PushID(i);
 			groups[i].DrawGui();
+			ImGui::PopID();
 		}
 
 		//ImGui::ShowDemoWindow();

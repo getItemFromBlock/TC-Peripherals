@@ -1,4 +1,4 @@
-#include <Peripheral.hpp>
+#include <peripherals/Peripheral.hpp>
 #include <imgui/imgui.h>
 #include <imgui/imgui_stdlib.h>
 

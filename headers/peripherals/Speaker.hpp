@@ -1,7 +1,7 @@
 #pragma once
 
 #include <atomic>
-#include <Peripheral.hpp>
+#include <peripherals/Peripheral.hpp>
 #include <miniaudio/miniaudio.h>
 
 //#define USE_MINIAUDIO
@@ -15,7 +15,7 @@ public:
 
 	virtual ~Speaker() override;
 
-	enum DataType : u32
+	enum AudioDataType : u32
 	{
 		Byte = 0,
 		Short = 1,
@@ -26,7 +26,8 @@ public:
 	void Update() override;
 	bool DrawGui(bool &visible) override;
 	u64 GetSize() override;
-	bool CreateAudioStream(DataType type, u32 freq, bool stereo);
+
+	bool CreateAudioStream(AudioDataType type, u32 freq, bool stereo);
 	bool CreateAudioStream();
 	bool HasAudioStream() const;
 	void StopAudioStream();
@@ -44,7 +45,7 @@ private:
 
 	float volume = 0.5f;
 
-	DataType dataType = Short;
+	AudioDataType dataType = Short;
 	u32 frequency = 48000;
 	bool stereo = false;
 

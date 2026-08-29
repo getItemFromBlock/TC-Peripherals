@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include <Types.hpp>
-#include <Peripheral.hpp>
+#include <peripherals/Peripheral.hpp>
 
 class PeripheralGroup
 {
